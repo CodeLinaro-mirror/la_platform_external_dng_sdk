@@ -176,7 +176,6 @@ cc_library {
         },
     },
 
-    sdclang: false,
     export_include_dirs: ["source"],
 }
 
