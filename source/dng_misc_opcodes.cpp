@@ -254,6 +254,7 @@ dng_rect dng_area_spec::Overlap (const dng_rect &tile) const
 
 /*****************************************************************************/
 
+DNG_ATTRIB_NO_SANITIZE("unsigned-integer-overflow")
 dng_rect dng_area_spec::ScaledOverlap (const dng_rect &tile) const
 	{
 	
@@ -440,7 +441,7 @@ void dng_opcode_MapTable::ReplicateLastEntry ()
 	
 	uint16 *table = fTable->Buffer_uint16 ();
 		
-	uint16 lastEntry = table [fCount];
+	uint16 lastEntry = table [fCount - 1];
 	
 	for (uint32 index = fCount; index < 0x10000; index++)
 		{
@@ -511,7 +512,7 @@ void dng_opcode_MapTable::Prepare (dng_negative &negative,
 		
 		uint16 *dstTable = fBlackAdjustedTable->Buffer_uint16 ();
 		
-		real64 srcScale = 65535.0 / (65535.0 - blackLevel);
+		real64 srcScale = (blackLevel < 65535) ? 65535.0 / (65535.0 - blackLevel) : 0.0;
 		
 		real64 dstScale = (65535.0 - blackLevel) / 65535.0;
 		
@@ -560,12 +561,17 @@ void dng_opcode_MapTable::ProcessArea (dng_negative & /* negative */,
   
 		const uint16 *table = fBlackAdjustedTable.Get () ? fBlackAdjustedTable->Buffer_uint16 ()
 														 : fTable			  ->Buffer_uint16 ();
-		
-		for (uint32 plane = fAreaSpec.Plane ();
-			 plane < fAreaSpec.Plane () + fAreaSpec.Planes () &&
-			 plane < buffer.Planes ();
-			 plane++)
+// BEGIN GOOGLE MODIFICATION
+		const uint32 planeStart = fAreaSpec.Plane ();
+		const uint32 planeCount = fAreaSpec.Planes ();
+		const uint32 bufferPlanes = buffer.Planes ();
+
+		for (uint32 plane = planeStart;
+			 plane < bufferPlanes &&
+			 plane - planeStart < planeCount;
+			 ++plane)
 			{
+// END GOOGLE MODIFICATION
 			
 			DoMapArea16 (buffer.DirtyPixel_uint16 (overlap.t, overlap.l, plane),
 						 1,
