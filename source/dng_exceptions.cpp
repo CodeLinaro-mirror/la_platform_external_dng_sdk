@@ -1,16 +1,9 @@
 /*****************************************************************************/
-// Copyright 2006-2007 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
-/*****************************************************************************/
-
-/* $Id: //mondo/dng_sdk_1_4/dng_sdk/source/dng_exceptions.cpp#2 $ */ 
-/* $DateTime: 2012/06/06 12:08:58 $ */
-/* $Change: 833617 $ */
-/* $Author: tknoll $ */
-
 /*****************************************************************************/
 
 #include "dng_exceptions.h"
@@ -28,17 +21,24 @@
 /*****************************************************************************/
 
 void ReportWarning (const char *message,
-				    const char *sub_message)
+					const char *sub_message)
 	{
 	
-	
 	#if qDNGReportErrors
-
+		
+	#ifdef cr_logw
+	
+	cr_logs("report", 2, NULL, 0, cr_logfunc(), "%s %s\n", message, sub_message ? sub_message : "");
+	
+	#else
+	
 	if (sub_message)
 		fprintf (stderr, "*** Warning: %s (%s) ***\n", message, sub_message);
 	else 
 		fprintf (stderr, "*** Warning: %s ***\n", message);
 	
+	#endif
+		
 	#else
 
 	(void) message;
@@ -53,14 +53,22 @@ void ReportWarning (const char *message,
 void ReportError (const char *message,
 				  const char *sub_message)
 	{
-	
+
 	#if qDNGReportErrors
 
+	#ifdef cr_loge
+	
+	cr_logs("report", 3, NULL, 0, cr_logfunc(), "%s %s\n", message, sub_message ? sub_message : "");
+   
+	#else
+	
 	if (sub_message)
 		fprintf (stderr, "*** Error: %s (%s) ***\n", message, sub_message);
 	else 
 		fprintf (stderr, "*** Error: %s ***\n", message);
-	
+		
+	#endif
+		
 	#else
 
 	(void) message;
@@ -173,6 +181,12 @@ void Throw_dng_error (dng_error_code err,
 					break;
 					}
 					
+				case dng_error_overflow:
+					{
+					message = "Arithmetic overflow/underflow";
+					break;
+					}
+					
 				default:
 					{
 					message = "Unknown error";
@@ -192,13 +206,19 @@ void Throw_dng_error (dng_error_code err,
 		
 	#else
 	
+	#if !qDNGVerboseExceptions
 	(void) message;
 	(void) sub_message;
+	#endif
 	(void) silent;
 	
 	#endif
 	
+	#if qDNGVerboseExceptions
+	throw dng_exception (err, message, sub_message);
+	#else
 	throw dng_exception (err);
+	#endif
 	
 	}
 

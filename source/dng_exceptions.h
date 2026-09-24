@@ -1,15 +1,10 @@
 /*****************************************************************************/
-// Copyright 2006-2007 Adobe Systems Incorporated
+// Copyright 2006-2019 Adobe Systems Incorporated
 // All Rights Reserved.
 //
-// NOTICE:  Adobe permits you to use, modify, and distribute this file in
+// NOTICE:	Adobe permits you to use, modify, and distribute this file in
 // accordance with the terms of the Adobe license agreement accompanying it.
 /*****************************************************************************/
-
-/* $Id: //mondo/dng_sdk_1_4/dng_sdk/source/dng_exceptions.h#1 $ */ 
-/* $DateTime: 2012/05/30 13:28:51 $ */
-/* $Change: 832332 $ */
-/* $Author: tknoll $ */
 
 /** \file
  * C++ exception support for DNG SDK.
@@ -25,12 +20,56 @@
 #include "dng_errors.h"
 #include "dng_flags.h"
 
+#include <exception>
+#include <string>
+
+/*****************************************************************************/
+
+// DNG_NO_RETURN
+// DNG_NO_RETURN_ENABLED
+
+#if defined(DNG_NO_RETURN) != defined(DNG_NO_RETURN_ENABLED)
+#error DNG_NO_RETURN and DNG_NO_RETURN_ENABLED must both be defined or undefined here.
+#endif
+
+// Use DNG_NO_RETURN in header file declaration of a function that
+// does not return.
+//
+// It should be placed
+//     * before the return type of the function, AND
+//     * before any 'inline' keyword, AND
+//     * before any 'static' keyword.
+//  as the gcc version supports this and the C++11 version requires it.
+
+// If DNG_NO_RETURN not defined, attempt to define using C++11 attribute.
+
+#ifndef DNG_NO_RETURN
+#if defined(__cplusplus)
+#if __cplusplus >= 201103L
+#define DNG_NO_RETURN [[noreturn]]
+#define DNG_NO_RETURN_ENABLED 1
+#endif
+#endif
+#endif
+
+// If DNG_NO_RETURN still not defined, use GCC version or define to nothing.
+
+#ifndef DNG_NO_RETURN
+#ifdef __GNUC__
+#define DNG_NO_RETURN __attribute__((noreturn))
+#define DNG_NO_RETURN_ENABLED 1
+#else
+#define DNG_NO_RETURN
+#define DNG_NO_RETURN_ENABLED 0
+#endif
+#endif
+
 /*****************************************************************************/
 
 /// Display a warning message. Note that this may just eat the message.
 
 void ReportWarning (const char *message,
-				    const char *sub_message = NULL);
+					const char *sub_message = NULL);
 	
 /*****************************************************************************/
 
@@ -43,12 +82,14 @@ void ReportError (const char *message,
 
 /// \brief All exceptions thrown by the DNG SDK use this exception class.
 
-class dng_exception
+class dng_exception : public std::exception
 	{
 	
 	private:
 	
 		dng_error_code fErrorCode;
+		
+		std::string fErrorMsg;
 	
 	public:
 	
@@ -58,10 +99,43 @@ class dng_exception
 		dng_exception (dng_error_code code)
 		
 			: fErrorCode (code)
+
 			
 			{
+			fErrorMsg = "dng_error: ";
+			fErrorMsg += std::to_string (fErrorCode);
 			}
 		
+		#if qDNGVerboseExceptions
+		
+		dng_exception (dng_error_code code,
+					   const char *message,
+					   const char *sub_message)
+
+			: fErrorCode (code)
+
+			{
+			
+			fErrorMsg = "dng_error: ";
+			fErrorMsg += std::to_string (fErrorCode);
+			
+			if (message)
+				{
+				fErrorMsg += ": ";
+				fErrorMsg += message;
+				}
+			
+			if (sub_message)
+				{
+				fErrorMsg += " (";
+				fErrorMsg += sub_message;
+				fErrorMsg += ")";
+				}
+			
+			}
+		
+		#endif	// qDNGVerboseExceptions
+
 		virtual ~dng_exception ()
 			{ 
 			}
@@ -74,16 +148,21 @@ class dng_exception
 			return fErrorCode;
 			}
 
+		virtual char const * what () const noexcept override
+			{
+			return fErrorMsg.c_str ();
+			}
+
 	};
 	
 /******************************************************************************/
 
 /// \brief Throw an exception based on an arbitrary error code.
 
-void Throw_dng_error (dng_error_code err,
-					  const char * message = NULL,
-					  const char * sub_message = NULL,
-					  bool silent = false);
+DNG_NO_RETURN void Throw_dng_error (dng_error_code err,
+									const char * message = NULL,
+									const char * sub_message = NULL,
+									bool silent = false);
 
 /******************************************************************************/
 
@@ -116,6 +195,18 @@ inline void ThrowProgramError (const char * sub_message = NULL)
 
 /*****************************************************************************/
 
+/// \brief Convenience function to throw dng_exception with error code
+/// dng_error_overflow.
+
+inline void ThrowOverflow (const char * sub_message = NULL)
+	{
+	
+	Throw_dng_error (dng_error_overflow, NULL, sub_message);
+	
+	}
+
+/*****************************************************************************/
+
 /// \brief Convenience function to throw dng_exception with error code 
 /// dng_error_not_yet_implemented .
 
@@ -131,10 +222,10 @@ inline void ThrowNotYetImplemented (const char * sub_message = NULL)
 /// \brief Convenience function to throw dng_exception with error code
 /// dng_error_silent .
 
-inline void ThrowSilentError ()
+inline void ThrowSilentError (const char *sub_message = NULL)
 	{
 	
-	Throw_dng_error (dng_error_silent);
+	Throw_dng_error (dng_error_silent, NULL, sub_message);
 	
 	}
 
@@ -155,10 +246,11 @@ inline void ThrowUserCanceled ()
 /// \brief Convenience function to throw dng_exception with error code
 /// dng_error_host_insufficient .
 
-inline void ThrowHostInsufficient (const char * sub_message = NULL)
+inline void ThrowHostInsufficient (const char * sub_message = NULL,
+								   bool silent = false)
 	{
 	
-	Throw_dng_error (dng_error_host_insufficient, NULL, sub_message);
+	Throw_dng_error (dng_error_host_insufficient, NULL, sub_message, silent);
 	
 	}
 
